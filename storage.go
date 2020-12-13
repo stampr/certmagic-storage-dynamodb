@@ -71,7 +71,11 @@ func (s *Storage) initConfig() error {
 	}
 	// Initialize DDB client, if needed
 	if s.Dynamo == nil {
-		s.Dynamo = dynamo.New(session.New(), &aws.Config{
+		session, err := session.NewSession()
+		if err != nil {
+			return err
+		}
+		s.Dynamo = dynamo.New(session, &aws.Config{
 			Endpoint:   &s.AwsEndpoint,
 			Region:     &s.AwsRegion,
 			DisableSSL: &s.AwsDisableSSL,
