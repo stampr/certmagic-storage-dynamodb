@@ -1,4 +1,4 @@
-module github.com/stampr/certmagic-storage-dynamodb
+module github.com/stampr/certmagic-storage-dynamodb/v2
 
 go 1.13
 
