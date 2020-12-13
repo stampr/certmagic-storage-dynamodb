@@ -75,6 +75,7 @@ func (s *Storage) initConfig() error {
 			Endpoint:   &s.AwsEndpoint,
 			Region:     &s.AwsRegion,
 			DisableSSL: &s.AwsDisableSSL,
+			LogLevel:   aws.LogLevel(aws.LogDebugWithHTTPBody),
 		})
 		s.Table = s.Dynamo.Table(s.TableName)
 	}
