@@ -22,9 +22,9 @@ const (
 	primaryKeyAttribute          = "PrimaryKey"
 	lastUpdatedAttribute         = "LastUpdated"
 	lockAttribute                = "Lock"
-	defaultLockTimeoutMinutes    = caddy.Duration(1 * time.Minute)
+	defaultLockTimeoutMinutes    = caddy.Duration(5 * time.Minute)
 	defaultLockFreshnessInterval = caddy.Duration(10 * time.Second)
-	defaultLockPollingInterval   = caddy.Duration(1 * time.Second)
+	defaultLockPollingInterval   = caddy.Duration(5 * time.Second)
 	stackTraceBufferSize         = 1024 * 128
 	eFreshLockFileMessage        = "fresh lock file exists: "
 	eDynamoNotFound              = "dynamo: no item found"
