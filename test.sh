@@ -1,3 +1,5 @@
+# NOTE: this file can be used to run tests locally, but it is also used in .github/workflows/test.yml, so before updating here, review that file
+
 DDBLOCALHOME=dynamodb_local_latest
 
 warn() {
