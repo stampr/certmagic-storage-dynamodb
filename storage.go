@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"runtime"
 	"strings"
@@ -88,7 +89,7 @@ func (s *Storage) initConfig() error {
 }
 
 // Store puts value at key.
-func (s *Storage) Store(key string, value []byte) error {
+func (s *Storage) Store(_ context.Context, key string, value []byte) error {
 	if err := s.initConfig(); err != nil {
 		return err
 	}
@@ -100,7 +101,7 @@ func (s *Storage) Store(key string, value []byte) error {
 }
 
 // Load retrieves the value at key.
-func (s *Storage) Load(key string) ([]byte, error) {
+func (s *Storage) Load(_ context.Context, key string) ([]byte, error) {
 	if err := s.initConfig(); err != nil {
 		return []byte{}, err
 	}
@@ -112,20 +113,22 @@ func (s *Storage) Load(key string) ([]byte, error) {
 }
 
 // Delete deletes key.
-func (s *Storage) Delete(key string) error {
+func (s *Storage) Delete(_ context.Context, key string) error {
 	if err := s.initConfig(); err != nil {
 		return err
 	}
+
 	if key == "" {
 		return errors.New("key must not be empty")
 	}
+
 	return s.Table.Delete(primaryKeyAttribute, key).Run()
 }
 
 // Exists returns true if the key exists
 // and there was no error checking.
-func (s *Storage) Exists(key string) bool {
-	cert, err := s.Load(key)
+func (s *Storage) Exists(ctx context.Context, key string) bool {
+	cert, err := s.Load(ctx, key)
 	if string(cert) != "" && err == nil {
 		return true
 	}
@@ -144,7 +147,7 @@ func (s *Storage) buildListScan(prefix string) *dynamo.Scan {
 // will be enumerated (i.e. "directories"
 // should be walked); otherwise, only keys
 // prefixed exactly by prefix will be listed.
-func (s *Storage) List(prefix string, recursive bool) ([]string, error) {
+func (s *Storage) List(_ context.Context, prefix string, recursive bool) ([]string, error) {
 	if err := s.initConfig(); err != nil {
 		return []string{}, err
 	}
@@ -180,11 +183,11 @@ func (s *Storage) List(prefix string, recursive bool) ([]string, error) {
 }
 
 // Stat returns information about key.
-func (s *Storage) Stat(key string) (certmagic.KeyInfo, error) {
+func (s *Storage) Stat(_ context.Context, key string) (certmagic.KeyInfo, error) {
 	item, err := s.readItem(key)
 	if err != nil {
 		if err.Error() == eDynamoNotFound {
-			return certmagic.KeyInfo{}, certmagic.ErrNotExist(fmt.Errorf("key %s doesn't exist", key))
+			return certmagic.KeyInfo{}, err
 		}
 		return certmagic.KeyInfo{}, err
 	}
@@ -357,7 +360,7 @@ func (s *Storage) Lock(ctx context.Context, key string) error {
 // called after a successful call to Lock, and only after the
 // critical section is finished, even if it errored or timed
 // out. Unlock cleans up any resources allocated during Lock.
-func (s *Storage) Unlock(key string) error {
+func (s *Storage) Unlock(ctx context.Context, key string) error {
 	return s.removeLockfile(key)
 }
 
@@ -367,9 +370,15 @@ func (s *Storage) readItem(key string) (Item, error) {
 		Get(primaryKeyAttribute, key).
 		Consistent(true).
 		One(&result)
+	if errors.Is(err, dynamo.ErrNotFound) {
+		return Item{}, fs.ErrNotExist // fs.ErrNotExist is expected
+	}
 	if err != nil {
 		return Item{}, err
 	}
+	// if len(result.Contents) == 0 {
+	// 	return Item{}, fs.ErrNotExist
+	// }
 	return result, nil
 }
 

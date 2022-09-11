@@ -2,6 +2,8 @@ package dynamodbstorage
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"reflect"
 	"testing"
@@ -12,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/caddyserver/caddy/v2"
-	"github.com/caddyserver/certmagic"
 )
 
 const TestTableName = "CertMagicTest"
@@ -197,13 +198,13 @@ func TestDynamoDBStorage_Store(t *testing.T) {
 				AwsRegion:     tt.fields.AwsRegion,
 				AwsDisableSSL: tt.fields.AwsDisableSSL,
 			}
-			err := s.Store(tt.args.key, tt.args.value)
+			err := s.Store(context.Background(), tt.args.key, tt.args.value)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Store() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if err == nil {
-				loaded, err := s.Load(tt.args.key)
+				loaded, err := s.Load(context.Background(), tt.args.key)
 				if err != nil {
 					t.Errorf("failed to load after store: %s", err.Error())
 					return
@@ -239,7 +240,7 @@ func TestDynamoDBStorage_List(t *testing.T) {
 		"domain3": "cert3",
 	}
 	for k, v := range fixturesWithPrefix {
-		err := storage.Store(k, []byte(v))
+		err := storage.Store(context.Background(), k, []byte(v))
 		if err != nil {
 			t.Errorf("failed to store fixture %s, error: %s", k, err.Error())
 			return
@@ -251,14 +252,14 @@ func TestDynamoDBStorage_List(t *testing.T) {
 		"anothernotinlist": "cert5",
 	}
 	for k, v := range fixtures {
-		err := storage.Store(k, []byte(v))
+		err := storage.Store(context.Background(), k, []byte(v))
 		if err != nil {
 			t.Errorf("failed to store fixture %s, error: %s", k, err.Error())
 			return
 		}
 	}
 
-	foundKeys, err := storage.List(prefix, false)
+	foundKeys, err := storage.List(context.Background(), prefix, false)
 	if err != nil {
 		t.Errorf("failed to list keys: %s", err.Error())
 		return
@@ -270,7 +271,7 @@ func TestDynamoDBStorage_List(t *testing.T) {
 		return
 	}
 
-	noKeysFound, err := storage.List("invalid", false)
+	noKeysFound, err := storage.List(context.Background(), "invalid", false)
 	if err != nil {
 		t.Errorf("unable to list keys with invalid prefix: %s", err.Error())
 		return
@@ -296,13 +297,13 @@ func TestDynamoDBStorage_Stat(t *testing.T) {
 		AwsDisableSSL: DisableSSL,
 	}
 
-	err = storage.Store("key", []byte("value"))
+	err = storage.Store(context.Background(), "key", []byte("value"))
 	if err != nil {
 		t.Errorf("failed to store fixture key/value: %s", err.Error())
 		return
 	}
 
-	stat, err := storage.Stat("key")
+	stat, err := storage.Stat(context.Background(), "key")
 	if err != nil {
 		t.Errorf("failed to stat item: %s", err.Error())
 		return
@@ -336,13 +337,13 @@ func TestDynamoDBStorage_Delete(t *testing.T) {
 		AwsDisableSSL: DisableSSL,
 	}
 
-	err = storage.Store("key", []byte("value"))
+	err = storage.Store(context.Background(), "key", []byte("value"))
 	if err != nil {
 		t.Errorf("failed to store fixture key/value: %s", err.Error())
 		return
 	}
 
-	value, err := storage.Load("key")
+	value, err := storage.Load(context.Background(), "key")
 	if err != nil {
 		t.Errorf("unable to load key that was just stored: %s", err.Error())
 		return
@@ -353,13 +354,13 @@ func TestDynamoDBStorage_Delete(t *testing.T) {
 		return
 	}
 
-	err = storage.Delete("key")
+	err = storage.Delete(context.Background(), "key")
 	if err != nil {
 		t.Errorf("unable to delete key: %s", err.Error())
 		return
 	}
 
-	if storage.Exists("key") {
+	if storage.Exists(context.Background(), "key") {
 		t.Errorf("key still exists after delete")
 		return
 	}
@@ -397,11 +398,11 @@ func TestDynamoDBStorage_Lock(t *testing.T) {
 		t.Errorf("error creating lock second time: %s", err.Error())
 	}
 	if time.Since(before) < lockTimeout {
-		t.Errorf("creating second lock finished quicker than it shoud, in %v seconds", time.Since(before).Seconds())
+		t.Errorf("creating second lock finished quicker than it should, in %v seconds", time.Since(before).Seconds())
 	}
 
 	// try to unlock a key that doesn't exist
-	err = storage.Unlock("doesntexist")
+	err = storage.Unlock(context.Background(), "doesntexist")
 	if err != nil {
 		t.Errorf("got error unlocking non-existant key")
 	}
@@ -421,9 +422,8 @@ func TestDynamoDBStorage_LoadErrNotExist(t *testing.T) {
 		AwsDisableSSL: DisableSSL,
 	}
 
-	_, err = storage.Load("notarealkey")
-	_, isNotErrNotExist := err.(certmagic.ErrNotExist)
-	if !isNotErrNotExist {
+	_, err = storage.Load(context.Background(), "notarealkey")
+	if !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("err was not a ErrNotExist, got: %s", err.Error())
 	}
 }
