@@ -7,6 +7,7 @@ on:
 
 jobs:
   test:
+    timeout-minutes: 10
     strategy:
       matrix:
         go-version: [1.18.x, 1.19.x]
@@ -17,4 +18,4 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
     - uses: actions/checkout@v3
-    - run: ./dev.sh
+    - run: ./test.sh
